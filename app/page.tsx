@@ -1,66 +1,371 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client'
 
-export default function Home() {
+import { useState, useEffect, useRef } from 'react';
+import { useSession } from "next-auth/react";
+import { useRouter, useSearchParams } from 'next/navigation';
+import SearchBar from './components/SearchBar';
+import SearchResults from './components/SearchResults';
+import ResearchResults from './components/ResearchResults';
+import ResearchChat from './components/ResearchChat';
+import ResizeHandle from './components/ResizeHandle';
+import VideoPlayer from './components/VideoPlayer';
+import TranscriptView from './components/TranscriptView';
+import Filters from './components/Filters';
+import Statistics from './components/Statistics';
+import MindMap from './components/MindMap';
+import UtteranceMap from './components/UtteranceMap';
+import LoginButton from './components/LoginButton';
+import { initDatabase, initModel, searchUtterances, searchResearchTopics, getSpeakers, getDateRange, getFullTranscript } from '@/lib/dbUtils';
+import './App.css';
+
+export default function HomePage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [researchResults, setResearchResults] = useState([]);
+  const [selectedClip, setSelectedClip] = useState(null);
+  const [speakers, setSpeakers] = useState([]);
+  const [dateRange, setDateRange] = useState({ min: null, max: null });
+  const [filters, setFilters] = useState({
+    speaker: [],
+    startDate: '',
+    endDate: '',
+    hasAiSummary: false
+  });
+  const [showStats, setShowStats] = useState(false);
+  const [autoPlay, setAutoPlay] = useState(true);
+  const [fullTranscript, setFullTranscript] = useState([]);
+  const [currentTime, setCurrentTime] = useState(0);
+  const seekRef = useRef(null);
+  const [activeView, setActiveView] = useState('search');
+  const [researchQuery, setResearchQuery] = useState('');
+  const [panelSizes, setPanelSizes] = useState({
+    chatWidth: 400,
+    videoWidth: 500
+  });
+
+  // Handle authentication
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+
+  // Read URL params on mount
+  useEffect(() => {
+    const viewParam = searchParams.get('view');
+    const queryParam = searchParams.get('q');
+
+    if (viewParam) {
+      setActiveView(viewParam);
+    }
+
+    if (queryParam && viewParam === 'research') {
+      setResearchQuery(queryParam);
+      if (!loading) {
+        handleResearchSearch(queryParam);
+      }
+    }
+  }, [searchParams, loading]);
+
+  // Initialize database
+  useEffect(() => {
+    async function init() {
+      try {
+        setLoading(true);
+        await initDatabase();
+        await initModel();
+
+        const availableSpeakers = getSpeakers();
+        const range = getDateRange();
+
+        setSpeakers(availableSpeakers);
+        setDateRange(range);
+        setLoading(false);
+      } catch (error) {
+        console.error('Failed to initialize:', error);
+        setLoading(false);
+      }
+    }
+
+    if (status === 'authenticated') {
+      init();
+    }
+  }, [status]);
+
+  const handleSearch = async (searchQuery) => {
+    if (!searchQuery.trim()) {
+      setResults([]);
+      return;
+    }
+
+    setSearching(true);
+    setQuery(searchQuery);
+
+    try {
+      const searchResults = await searchUtterances(searchQuery, filters, 50);
+      setResults(searchResults);
+    } catch (error) {
+      console.error('Search failed:', error);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleResearchSearch = async (searchQuery) => {
+    if (!searchQuery.trim()) {
+      setResearchResults([]);
+      setResearchQuery('');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('q');
+      window.history.pushState({}, '', url);
+      return;
+    }
+
+    setSearching(true);
+    setQuery(searchQuery);
+    setResearchQuery(searchQuery);
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'research');
+    url.searchParams.set('q', searchQuery);
+    window.history.pushState({}, '', url);
+
+    try {
+      const searchResults = await searchResearchTopics(searchQuery, 50);
+      setResearchResults(searchResults);
+    } catch (error) {
+      console.error('Research search failed:', error);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleResizeChatPanel = (deltaX) => {
+    setPanelSizes(prev => ({
+      ...prev,
+      chatWidth: Math.max(300, Math.min(600, prev.chatWidth + deltaX))
+    }));
+  };
+
+  const handleResizeVideoPanel = (deltaX) => {
+    setPanelSizes(prev => ({
+      ...prev,
+      videoWidth: Math.max(400, Math.min(800, prev.videoWidth - deltaX))
+    }));
+  };
+
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+    if (query) {
+      handleSearch(query);
+    }
+  };
+
+  const handleClipSelect = (clip) => {
+    setSelectedClip(clip);
+    const transcript = getFullTranscript(clip.video_url);
+    setFullTranscript(transcript);
+    setCurrentTime(clip.timestamp_seconds || 0);
+  };
+
+  const handleSeek = (time) => {
+    if (seekRef.current) {
+      seekRef.current(time);
+    }
+  };
+
+  if (status === 'loading' || loading) {
+    return (
+      <div className="app loading">
+        <div className="loading-container">
+          <h1>Podcast Index</h1>
+          <p>Loading database and embedding model...</p>
+          <div className="spinner"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="app">
+      <div className="app-nav">
+        <div className="nav-tabs">
+          <button
+            className={`nav-button ${activeView === 'search' ? 'active' : ''}`}
+            onClick={() => setActiveView('search')}
           >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            Search
+          </button>
+          <button
+            className={`nav-button ${activeView === 'research' ? 'active' : ''}`}
+            onClick={() => setActiveView('research')}
+          >
+            Research
+          </button>
+          <button
+            className={`nav-button ${activeView === 'map' ? 'active' : ''}`}
+            onClick={() => setActiveView('map')}
+          >
+            2D Map
+          </button>
+        </div>
+        <div className="nav-user">
+          <LoginButton />
+        </div>
+      </div>
+
+      {activeView === 'map' ? (
+        <UtteranceMap />
+      ) : activeView === 'mindmap' ? (
+        <MindMap />
+      ) : activeView === 'research' ? (
+        <div className="research-container" style={{
+          gridTemplateColumns: `${panelSizes.chatWidth}px 8px 1fr 8px ${panelSizes.videoWidth}px`
+        }}>
+          <div className="research-chat-panel">
+            <ResearchChat
+              onTopicSelect={(topicTitle) => handleResearchSearch(topicTitle)}
+              onClipSelect={handleClipSelect}
             />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          </div>
+
+          <ResizeHandle onResize={handleResizeChatPanel} direction="vertical" />
+
+          <div className="research-main-panel">
+            <div className="search-controls">
+              <SearchBar
+                onSearch={handleResearchSearch}
+                searching={searching}
+                placeholder="Search topics..."
+                initialValue={researchQuery}
+              />
+
+              {researchResults.length > 0 && (
+                <div className="results-header">
+                  <div className="results-count">
+                    Found {researchResults.length} relevant topics
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="results-section">
+              <ResearchResults
+                results={researchResults}
+                onClipSelect={handleClipSelect}
+                selectedClip={selectedClip}
+                searching={searching}
+              />
+            </div>
+          </div>
+
+          <ResizeHandle onResize={handleResizeVideoPanel} direction="vertical" />
+
+          <div className="video-section">
+            {selectedClip ? (
+              <>
+                <div className="video-container-wrapper">
+                  <VideoPlayer
+                    clip={selectedClip}
+                    autoPlay={autoPlay}
+                    onAutoPlayChange={setAutoPlay}
+                    onTimeUpdate={setCurrentTime}
+                    onSeek={seekRef}
+                  />
+                </div>
+                <div className="transcript-container">
+                  <TranscriptView
+                    utterances={fullTranscript}
+                    currentTime={currentTime}
+                    onSeek={handleSeek}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="video-placeholder">
+                <h3>No clip selected</h3>
+                <p>Select a topic clip to view the video and full transcript</p>
+              </div>
+            )}
+          </div>
         </div>
-      </main>
+      ) : (
+        <div className="app-container">
+          <div className="left-panel">
+            <div className="search-controls">
+              <SearchBar onSearch={handleSearch} searching={searching} />
+
+              <Filters
+                speakers={speakers}
+                dateRange={dateRange}
+                filters={filters}
+                onFilterChange={handleFilterChange}
+              />
+
+              {results.length > 0 && (
+                <div className="results-header">
+                  <div className="results-count">
+                    Found {results.length} relevant clips
+                  </div>
+                  <button
+                    className="stats-toggle"
+                    onClick={() => setShowStats(!showStats)}
+                  >
+                    {showStats ? 'Hide' : 'Show'} Statistics
+                  </button>
+                </div>
+              )}
+
+              {showStats && results.length > 0 && (
+                <Statistics results={results} />
+              )}
+            </div>
+
+            <div className="results-section">
+              <SearchResults
+                results={results}
+                onClipSelect={handleClipSelect}
+                selectedClip={selectedClip}
+                searching={searching}
+              />
+            </div>
+          </div>
+
+          <div className="video-section">
+            {selectedClip ? (
+              <>
+                <div className="video-container-wrapper">
+                  <VideoPlayer
+                    clip={selectedClip}
+                    autoPlay={autoPlay}
+                    onAutoPlayChange={setAutoPlay}
+                    onTimeUpdate={setCurrentTime}
+                    onSeek={seekRef}
+                  />
+                </div>
+                <div className="transcript-container">
+                  <TranscriptView
+                    utterances={fullTranscript}
+                    currentTime={currentTime}
+                    onSeek={handleSeek}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="video-placeholder">
+                <h3>No video selected</h3>
+                <p>Select a search result to view the video and full transcript</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,36 +1,143 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Podcast Research Tool - Next.js App
+
+A Next.js application for searching and analyzing podcast transcripts with AI-powered semantic search and chat.
+
+## Features
+
+- **Twitter OAuth Authentication** - Users must sign in to access the app
+- **Semantic Search** - Find relevant podcast topics using embeddings
+- **AI Chat Interface** - Ask questions and get AI-generated responses with citations
+- **Research Topics** - Browse comprehensive summaries of podcast discussions
+- **Analytics Tracking** - Track user searches and queries
+- **Protected Routes** - All routes require authentication via middleware
+
+## Tech Stack
+
+- **Next.js 15** - React framework with App Router
+- **NextAuth v5** - Authentication with Twitter OAuth 2.0
+- **TypeScript** - Type-safe development
+- **Tailwind CSS** - Styling
+- **Transformers.js** - Client-side ML for embeddings
+- **Better-SQLite3** - Database access
+- **OpenRouter** - LLM API for chat
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+ installed
+- Twitter Developer account with OAuth 2.0 app
+- OpenRouter API key
+- SQLite database (`podcasts.db`) with podcast data
+
+### Installation
+
+```bash
+# Install dependencies
+npm install
+
+# Copy environment variables
+cp .env.example .env.local
+
+# Edit .env.local with your credentials
+```
+
+### Environment Variables
+
+```env
+# Twitter OAuth
+TWITTER_CLIENT_ID=your_twitter_client_id
+TWITTER_CLIENT_SECRET=your_twitter_client_secret
+
+# NextAuth Secret
+AUTH_SECRET=your_generated_secret
+
+# OpenRouter API
+OPENROUTER_API_KEY=your_openrouter_key
+```
+
+Generate `AUTH_SECRET` with:
+```bash
+openssl rand -base64 32
+```
+
+### Database Setup
+
+Place your `podcasts.db` file in the parent directory (`../podcasts.db` relative to the Next.js app).
+
+The database should have these tables:
+- `users` - User authentication data
+- `analytics_events` - Usage tracking
+- `research_topics` - Podcast topic summaries
+- `research_clips` - Timestamped clips
+- `utterances` - Individual speaker utterances with embeddings
+
+See `../AUTH_SETUP.md` for the schema.
+
+### Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Building for Production
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm run start
+```
 
-## Learn More
+## Deployment
 
-To learn more about Next.js, take a look at the following resources:
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed Vercel deployment instructions.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Quick Deploy to Vercel
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm i -g vercel
+vercel
+```
 
-## Deploy on Vercel
+Set environment variables in Vercel dashboard and update Twitter OAuth callback URLs.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Project Structure
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+nextjs-app/
+├── app/
+│   ├── api/               # API routes
+│   │   ├── auth/          # NextAuth routes
+│   │   ├── embed/         # Embedding generation
+│   │   ├── search-research/ # Search topics
+│   │   ├── research-chat/ # AI chat
+│   │   └── analytics/     # Analytics stats
+│   ├── login/             # Login page
+│   ├── page.tsx           # Main application
+│   └── layout.tsx         # Root layout
+├── lib/
+│   ├── auth.ts            # NextAuth configuration
+│   ├── ml.ts              # ML utilities (embeddings, similarity)
+│   ├── analytics.ts       # Analytics tracking
+│   └── llm.ts             # LLM API calls
+├── middleware.ts          # Auth middleware (protects all routes)
+└── vercel.json            # Vercel configuration
+```
+
+## Authentication Flow
+
+1. User visits any route
+2. Middleware checks for session
+3. If not authenticated, redirect to `/login`
+4. User clicks "Sign in with Twitter"
+5. OAuth flow completes
+6. User redirected to requested page
+
+## Security
+
+- All routes protected by middleware
+- JWT session strategy with 30-day expiry
+- Secure cookies in production (HTTPS)
+- CSRF protection via NextAuth
+- Twitter OAuth 2.0
