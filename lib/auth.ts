@@ -75,7 +75,7 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       console.log('[SESSION DEBUG] Token:', { sub: token.sub, email: token.email });
-      if (token.sub) {
+      if (token.sub && session.user) {
         try {
           const db = new Database(DB_PATH, { readonly: true });
           // Try to find user by twitter_id (token.sub should be the twitter ID after sign in)
@@ -84,8 +84,8 @@ export const authOptions: NextAuthOptions = {
 
           console.log('[SESSION DEBUG] User found:', user ? 'yes' : 'no');
           if (user) {
-            session.user.id = (user as any).id;
-            session.user.twitter_id = (user as any).twitter_id;
+            (session.user as any).id = (user as any).id;
+            (session.user as any).twitter_id = (user as any).twitter_id;
           }
         } catch (error) {
           console.error('[SESSION DEBUG] Session error:', error);

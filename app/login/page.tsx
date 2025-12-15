@@ -1,9 +1,10 @@
 'use client'
 
+import { Suspense } from "react"
 import { signIn } from "next-auth/react"
 import { useSearchParams } from "next/navigation"
 
-export default function LoginPage() {
+function LoginPageContent() {
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/'
 
@@ -70,5 +71,14 @@ export default function LoginPage() {
         </button>
       </div>
     </div>
+  )
+}
+
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginPageContent />
+    </Suspense>
   )
 }

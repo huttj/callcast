@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from 'next/navigation';
 import SearchBar from './components/SearchBar';
@@ -18,7 +18,7 @@ import LoginButton from './components/LoginButton';
 import { initDatabase, initModel, searchUtterances, searchResearchTopics, getSpeakers, getDateRange, getFullTranscript } from '@/lib/dbUtils';
 import './App.css';
 
-export default function HomePage() {
+function HomePageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -26,22 +26,22 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [researchResults, setResearchResults] = useState([]);
-  const [selectedClip, setSelectedClip] = useState(null);
-  const [speakers, setSpeakers] = useState([]);
-  const [dateRange, setDateRange] = useState({ min: null, max: null });
+  const [results, setResults] = useState<any[]>([]);
+  const [researchResults, setResearchResults] = useState<any[]>([]);
+  const [selectedClip, setSelectedClip] = useState<any>(null);
+  const [speakers, setSpeakers] = useState<any[]>([]);
+  const [dateRange, setDateRange] = useState<{ min: string | null; max: string | null }>({ min: null, max: null });
   const [filters, setFilters] = useState({
-    speaker: [],
+    speaker: [] as string[],
     startDate: '',
     endDate: '',
     hasAiSummary: false
   });
   const [showStats, setShowStats] = useState(false);
   const [autoPlay, setAutoPlay] = useState(true);
-  const [fullTranscript, setFullTranscript] = useState([]);
+  const [fullTranscript, setFullTranscript] = useState<any[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
-  const seekRef = useRef(null);
+  const seekRef = useRef<any>(null);
   const [activeView, setActiveView] = useState('search');
   const [researchQuery, setResearchQuery] = useState('');
   const [panelSizes, setPanelSizes] = useState({
@@ -98,7 +98,7 @@ export default function HomePage() {
     }
   }, [status]);
 
-  const handleSearch = async (searchQuery) => {
+  const handleSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
       setResults([]);
       return;
@@ -117,7 +117,7 @@ export default function HomePage() {
     }
   };
 
-  const handleResearchSearch = async (searchQuery) => {
+  const handleResearchSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
       setResearchResults([]);
       setResearchQuery('');
@@ -146,35 +146,35 @@ export default function HomePage() {
     }
   };
 
-  const handleResizeChatPanel = (deltaX) => {
+  const handleResizeChatPanel = (deltaX: number) => {
     setPanelSizes(prev => ({
       ...prev,
       chatWidth: Math.max(300, Math.min(600, prev.chatWidth + deltaX))
     }));
   };
 
-  const handleResizeVideoPanel = (deltaX) => {
+  const handleResizeVideoPanel = (deltaX: number) => {
     setPanelSizes(prev => ({
       ...prev,
       videoWidth: Math.max(400, Math.min(800, prev.videoWidth - deltaX))
     }));
   };
 
-  const handleFilterChange = (newFilters) => {
+  const handleFilterChange = (newFilters: any) => {
     setFilters(newFilters);
     if (query) {
       handleSearch(query);
     }
   };
 
-  const handleClipSelect = (clip) => {
+  const handleClipSelect = (clip: any) => {
     setSelectedClip(clip);
     const transcript = getFullTranscript(clip.video_url);
     setFullTranscript(transcript);
     setCurrentTime(clip.timestamp_seconds || 0);
   };
 
-  const handleSeek = (time) => {
+  const handleSeek = (time: number) => {
     if (seekRef.current) {
       seekRef.current(time);
     }
@@ -230,7 +230,7 @@ export default function HomePage() {
         }}>
           <div className="research-chat-panel">
             <ResearchChat
-              onTopicSelect={(topicTitle) => handleResearchSearch(topicTitle)}
+              onTopicSelect={(topicTitle: string) => handleResearchSearch(topicTitle)}
               onClipSelect={handleClipSelect}
             />
           </div>
@@ -367,5 +367,22 @@ export default function HomePage() {
         </div>
       )}
     </div>
+  );
+}
+
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={
+      <div className="app loading">
+        <div className="loading-container">
+          <h1>Podcast Index</h1>
+          <p>Loading...</p>
+          <div className="spinner"></div>
+        </div>
+      </div>
+    }>
+      <HomePageContent />
+    </Suspense>
   );
 }

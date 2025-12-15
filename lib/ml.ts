@@ -2,14 +2,14 @@
  * Machine learning utilities for embeddings and semantic search
  */
 
-import { pipeline, Pipeline } from '@xenova/transformers';
+import { pipeline } from '@xenova/transformers';
 
-let extractor: Pipeline | null = null;
+let extractor: any | null = null;
 
 /**
  * Initialize and cache the embedding model
  */
-export async function getEmbeddingModel(): Promise<Pipeline> {
+export async function getEmbeddingModel(): Promise<any> {
   if (!extractor) {
     console.log('Loading embedding model...');
     extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
